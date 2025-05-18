@@ -6,7 +6,6 @@ import Typography from '@mui/material/Typography'
 import CircularProgress from '@mui/material/CircularProgress'
 import Divider from '@mui/material/Divider'
 import authenrizedAxiosInstance from '~/utils/authorizedAxios'
-import { toast } from 'react-toastify'
 import { API_ROOT } from '~/utils/constants'
 
 function Dashboard() {
