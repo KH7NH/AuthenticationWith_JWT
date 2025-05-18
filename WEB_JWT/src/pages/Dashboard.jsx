@@ -1,4 +1,3 @@
-// Author: TrungQuanDev: https://youtube.com/@trungquandev
 import { useEffect, useState } from 'react'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
@@ -7,18 +6,36 @@ import CircularProgress from '@mui/material/CircularProgress'
 import Divider from '@mui/material/Divider'
 import authenrizedAxiosInstance from '~/utils/authorizedAxios'
 import { API_ROOT } from '~/utils/constants'
+import { Button } from '@mui/material'
+import { useNavigate } from 'react-router-dom'
+
 
 function Dashboard() {
   const [user, setUser] = useState(null)
+  const navigate = useNavigate()
+
 
   useEffect(() => {
     const fetchData = async () => {
       const res = await authenrizedAxiosInstance.get(`${API_ROOT}/v1/dashboards/access`)
-      console.log(res.data)
+      // console.log(res.data)
       setUser(res.data)
     }
     fetchData()
   }, [])
+  const handleLogout = async () => {
+    // TH1: Dùng localStorage > chỉ cần xoá thông tin user trong localstorage phía FE
+    localStorage.removeItem('accessToken')
+    localStorage.removeItem('refreshToken')
+    localStorage.removeItem('userInfo')
+
+    // TH2: Dùng Http only cookie > Gọi API để xử lý remove cookies
+    await authenrizedAxiosInstance.delete(`${API_ROOT}/v1/users/logout`)
+    setUser(null)
+    
+    // Điều hướng về trang login
+    navigate('/login')
+  }
 
   if (!user) {
     return (
@@ -50,10 +67,19 @@ function Dashboard() {
         <Typography variant="span" sx={{ fontWeight: 'bold', '&:hover': { color: '#fdba26' } }}>{user?.email}</Typography>
         &nbsp; đăng nhập thành công thì mới cho truy cập vào.
       </Alert>
-
+      <Button
+      type='button'
+      variant='contained'
+      color='info'
+      size='large'
+      sx={{mt: 2, maxWidth: 'min-content', alignSelf: 'flex-end'}}
+      onClick={handleLogout}
+      >
+        Logout
+      </Button>
       <Divider sx={{ my: 2 }} />
     </Box>
+  
   )
 }
-
 export default Dashboard
