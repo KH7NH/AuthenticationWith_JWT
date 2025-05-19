@@ -8,6 +8,7 @@ import authenrizedAxiosInstance from '~/utils/authorizedAxios'
 import { API_ROOT } from '~/utils/constants'
 import { Button } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
+import { handleLogoutAPI } from '~/apis'
 
 
 function Dashboard() {
@@ -24,14 +25,10 @@ function Dashboard() {
     fetchData()
   }, [])
   const handleLogout = async () => {
-    // TH1: Dùng localStorage > chỉ cần xoá thông tin user trong localstorage phía FE
-    localStorage.removeItem('accessToken')
-    localStorage.removeItem('refreshToken')
-    localStorage.removeItem('userInfo')
-
-    // TH2: Dùng Http only cookie > Gọi API để xử lý remove cookies
-    await authenrizedAxiosInstance.delete(`${API_ROOT}/v1/users/logout`)
-    setUser(null)
+    //Gọi API logout
+    await handleLogoutAPI()
+    // Nếu như trường hợp dùng cookie thì nhớ xoá userInfo trong Localstorage
+    //localStorage.removeItem('userInfo')
     
     // Điều hướng về trang login
     navigate('/login')
