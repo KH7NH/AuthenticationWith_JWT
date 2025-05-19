@@ -33,6 +33,12 @@ authenrizedAxiosInstance.interceptors.request.use( (config) => {
     return Promise.reject(error)
 })
 
+/** Khởi tạo một cái promise cho việc gọi api refreshtoken
+Mục đích tạo promise này để khi nhận yêu cầu refreshtoken đầu tiên thì hold lại việc api refresh_token 
+cho tới khi xong xuôi thì mói retry lại những api bị lỗi trước đó thay vì cứ thế gọi refresh_token liên tục
+với mỗi request lỗi.
+ */
+let refreshTokenPromise = null
 // Add a response interceptor: Can thiệp vào những cái response nhận về từ API
 authenrizedAxiosInstance.interceptors.response.use((response) => {
     // Any status code that lie within the range of 2xx cause this function to trigger
@@ -57,40 +63,44 @@ authenrizedAxiosInstance.interceptors.response.use((response) => {
     // Nếu như nhận mã 410 từ BE thì sẽ gọi API refreshToken để làm mới accessToken
     // Đầu tiên lấy được các request APi đang bị lỗi thông quá error.config
     const originalRequest = error.config
-    if (error.response?.status === 410 && !originalRequest._retry) {
-        //Gán thêm một giá trị _retry luôn = true trong khoảng thời gian chờ, chỉ việc refresh token này chỉ 
-        // luôn gọi 1 lần trong cùng 1 thời điểm
-        originalRequest._retry = true
+    if (error.response?.status === 410 && originalRequest) {
+        if (!refreshTokenPromise) {
+            // Lấy refresh token từ localstorage (trong th localstorage)
+            const refreshToken = localStorage.getItem('refreshToken')
+            // Gọi API refresh token
+            refreshTokenPromise = refreshTokenAPI(refreshToken)
+                .then((res) => {
+                    //Lấy và gán lại accesstoken vào localstorage (Cho th localstorage)
+                    const { accessToken } = res.data
+                    localStorage.setItem('accessToken', accessToken)
+                    authenrizedAxiosInstance.defaults.headers.Authorization = `Bearer ${accessToken}`
 
-        // Lấy refresh token từ localstorage (trong th localstorage)
-        const refreshToken = localStorage.getItem('refreshToken')
-        // Gọi API refresh token
-        return refreshTokenAPI(refreshToken)
-        .then((res) => {
-            //Lấy và gán lại accesstoken vào localstorage (Cho th localstorage)
-            const {accessToken} = res.data
-            localStorage.setItem('accessToken', accessToken)
-            authenrizedAxiosInstance.defaults.headers.Authorization = `Bearer ${accessToken}`
+                    //Đồng thời lưu ý là accesstoken cũng đã được update lại ở cookie(cho th cookie)
+                    //...            
+                })
+                .catch((_error) => {
+                    // Nếu nhận bất kỳ lỗi nào từ api refresh token thì cứ logout ra luôn
+                    handleLogoutAPI().then(() => {
+                        // Nếu trường hợp dùng cookie thì xoá userInfo trong localstorage
+                        // localStorage.removeItem('userInfo')
 
-            //Đồng thời lưu ý là accesstoken cũng đã được update lại ở cookie(cho th cookie)
-
-            //Bước cuối cùng quan trọng: return lại axios instance của chúng ta kết hợp cái originalRequest
+                        // Điều hướng về trang login use basic js
+                        location.href = '/login'
+                    })
+                    return Promise.reject(_error)
+                })
+                .finally(() => { 
+                    // Dù API refreshtoken có thành công hay lỗi thì luôn gán lại cái refreshTokenPromise = null như ban đầu
+                    refreshTokenPromise = null
+                })
+        }
+        // Cuối cùng mói return refreshTokenPromise trong TH success ở đây
+        return refreshTokenPromise.then(() => {
+            // Quan trọng: return lại axios instance của chúng ta kết hợp cái originalRequest
             // để gọi lại những api ban đầu bị lỗi
             return authenrizedAxiosInstance(originalRequest)
         })
-        .catch((_error) => {
-            // Nếu nhận bất kỳ lỗi nào từ api refresh token thì cứ logout ra luôn
-            handleLogoutAPI().then(() => {
-                // Nếu trường hợp dùng cookie thì xoá userInfo trong localstorage
-                // localStorage.removeItem('userInfo')
-
-                // Điều hướng về trang login use basic js
-                location.href = '/login'
-            })
-            return Promise.reject(_error)
-        })
     }
-
     /**
     Xử lý tập trung phần hiển thị thông báo lỗi trả về từ moị API ở đây 
     console.log error ra là sẽ thấy cấu trúc data dẫn đến message lỗi như dưới đây
